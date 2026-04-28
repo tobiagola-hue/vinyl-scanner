@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VinylScan">
+<meta name="theme-color" content="#0d0d0d">
+<title>VinylScan</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0d0d0d;--s1:#161616;--s2:#1e1e1e;--s3:#242424;
+  --b1:#2a2a2a;--b2:#333;
+  --amber:#e8a020;--amber2:#7a500d;--amber3:#2a1a04;
+  --green:#4a9a5a;--green2:#1e3d22;--green3:#2d5e35;
+  --red:#c04040;--red2:#3d1616;
+  --text:#f0ede8;--t2:#888880;--t3:#555550;--t4:#333330;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --r:10px;--r2:14px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
+
+/* ── SCREENS ──────────────────────────────────── */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;transition:opacity .25s,transform .25s}
+.screen.hidden{opacity:0;pointer-events:none;transform:translateY(16px)}
+
+/* ── SETUP SCREEN ─────────────────────────────── */
+#setup{background:var(--bg);align-items:center;justify-content:center;padding:1.5rem 1.25rem;overflow-y:auto;gap:.9rem}
+.logo{display:flex;flex-direction:column;align-items:center;gap:.65rem}
+.logo-ring{width:66px;height:66px;border-radius:50%;border:1.5px solid var(--amber);position:relative;flex-shrink:0}
+.logo-ring::before{content:'';position:absolute;inset:50%;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;background:var(--amber)}
+.logo-ring::after{content:'';position:absolute;inset:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;border:.5px solid var(--b1)}
+.logo-name{font-family:var(--mono);font-size:18px;font-weight:500;letter-spacing:.16em}
+.logo-sub{font-size:11px;color:var(--t2);text-align:center;line-height:1.6}
+.chip{display:inline-block;font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:3px;letter-spacing:.06em}
+.chip.green{background:var(--green2);color:var(--green);border:1px solid var(--green3)}
+.chip.gray{background:var(--s2);color:var(--t3);border:1px solid var(--b1)}
+.chip.amber{background:var(--amber3);color:var(--amber);border:1px solid var(--amber2)}
+
+.card{width:100%;max-width:360px;background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);padding:.9rem}
+.card-title{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.12em;margin-bottom:.7rem}
+.step{display:flex;gap:10px;align-items:flex-start;margin-bottom:.55rem}
+.step:last-child{margin-bottom:0}
+.step-n{font-family:var(--mono);font-size:11px;color:var(--amber);flex-shrink:0;width:14px;padding-top:1px}
+.step-t{font-size:12px;color:var(--t2);line-height:1.5}
+.field{width:100%;max-width:360px}
+.field-label{font-family:var(--mono);font-size:9px;color:var(--t2);letter-spacing:.1em;margin-bottom:6px;display:flex;align-items:center;gap:7px}
+input[type=password],input[type=text]{width:100%;padding:12px 14px;background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border-color .2s}
+input:focus{border-color:var(--amber)}
+input::placeholder{color:var(--t4)}
+.hint{font-size:10px;color:var(--t3);margin-top:.4rem;line-height:1.55}
+a{color:var(--amber);text-decoration:none}
+.btn{width:100%;max-width:360px;padding:14px;font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.1em;cursor:pointer;border:none;border-radius:var(--r);transition:opacity .15s}
+.btn.primary{background:var(--amber);color:#0d0d0d}
+.btn.primary:active{opacity:.8}
+.env-info{width:100%;max-width:360px;background:var(--green2);border:1px solid var(--green3);border-radius:var(--r);padding:.75rem .9rem;font-size:11px;color:var(--green);line-height:1.55}
+
+/* ── CAMERA ───────────────────────────────────── */
+#cam{background:#000}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+canvas{display:none}
+.vf{position:absolute;inset:0;pointer-events:none}
+.vf-corner{position:absolute;width:20px;height:20px}
+.vf-corner.tl{top:18%;left:calc(50% - 105px);border-top:2px solid var(--amber);border-left:2px solid var(--amber)}
+.vf-corner.tr{top:18%;right:calc(50% - 105px);border-top:2px solid var(--amber);border-right:2px solid var(--amber)}
+.vf-corner.bl{top:68%;left:calc(50% - 105px);border-bottom:2px solid var(--amber);border-left:2px solid var(--amber)}
+.vf-corner.br{top:68%;right:calc(50% - 105px);border-bottom:2px solid var(--amber);border-right:2px solid var(--amber)}
+.vf-hint{position:absolute;top:calc(18% - 22px);left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:9px;color:rgba(232,160,32,.55);letter-spacing:.15em;white-space:nowrap}
+
+.topbar{position:absolute;top:0;left:0;right:0;padding:env(safe-area-inset-top,16px) 14px 12px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(to bottom,rgba(0,0,0,.82),transparent)}
+.topbar-name{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.18em}
+.topbar-r{display:flex;align-items:center;gap:8px}
+.pill{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px}
+.pill.ok{background:var(--green2);color:var(--green);border:1px solid var(--green3)}
+.pill.warn{background:var(--amber3);color:var(--amber);border:1px solid var(--amber2)}
+.icon-btn{width:33px;height:33px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;flex-shrink:0}
+
+.scan-wrap{position:absolute;bottom:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;padding-bottom:max(env(safe-area-inset-bottom),28px);padding-top:2.5rem;background:linear-gradient(to top,rgba(0,0,0,.88),transparent)}
+.scan-ring{width:76px;height:76px;border-radius:50%;border:2.5px solid var(--amber);background:rgba(13,13,13,.75);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s,opacity .12s}
+.scan-ring:active{transform:scale(.91)}
+.scan-dot{width:50px;height:50px;border-radius:50%;background:var(--amber);display:flex;align-items:center;justify-content:center}
+.scan-lbl{font-family:var(--mono);font-size:9px;color:var(--t2);letter-spacing:.16em;margin-top:10px}
+
+.scan-anim{position:absolute;left:50%;transform:translateX(-50%);width:210px;height:2px;background:linear-gradient(90deg,transparent,var(--amber),transparent);animation:sweep 1.3s ease-in-out infinite;top:18%;display:none}
+@keyframes sweep{0%,100%{top:18%}50%{top:68%}}
+.scan-status{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--mono);font-size:10px;color:var(--amber);letter-spacing:.2em;animation:blink 1s ease-in-out infinite;white-space:nowrap;display:none;text-align:center;line-height:1.9}
+@keyframes blink{0%,100%{opacity:.35}50%{opacity:1}}
+
+.toast{position:absolute;bottom:130px;left:14px;right:14px;padding:.75rem 1rem;background:var(--red2);border:1px solid var(--red);border-radius:var(--r);font-family:var(--mono);font-size:11px;color:#e07070;transform:translateY(14px);opacity:0;transition:all .28s;pointer-events:none;z-index:5}
+.toast.show{transform:translateY(0);opacity:1}
+
+/* ── RESULTS SHEET ────────────────────────────── */
+#sheet{position:absolute;bottom:0;left:0;right:0;max-height:91vh;overflow-y:auto;background:var(--s1);border-radius:18px 18px 0 0;border-top:1px solid var(--b1);transform:translateY(100%);transition:transform .38s cubic-bezier(.16,1,.3,1);padding-bottom:env(safe-area-inset-bottom,20px);-webkit-overflow-scrolling:touch}
+#sheet.open{transform:translateY(0)}
+.sheet-handle{width:32px;height:3px;background:var(--b1);border-radius:2px;margin:11px auto 0}
+#sheet-body{padding:.9rem 1.1rem 1.4rem}
+
+.alb-artist{font-size:19px;font-weight:500;line-height:1.2;margin-bottom:1px}
+.alb-title{font-size:13px;color:var(--t2);margin-bottom:9px;line-height:1.4}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:.75rem}
+.tag{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px;border:1px solid var(--b1);color:var(--t2);background:var(--s2)}
+.tag.hi{border-color:var(--amber2);color:var(--amber);background:var(--amber3)}
+.tag.ok{border-color:var(--green3);color:var(--green);background:var(--green2)}
+.tag.warn{border-color:#5a3a1a;color:#c88030;background:#251808}
+
+.conf-strip{height:2px;border-radius:1px;background:var(--b1);margin-bottom:.5rem;overflow:hidden}
+.conf-fill{height:100%;border-radius:1px;transition:width .5s ease}
+.conf-note{font-size:11px;font-style:italic;line-height:1.4;padding-left:.5rem;border-left:1.5px solid var(--b2);margin-bottom:.8rem}
+
+.div{height:1px;background:var(--b1);margin:.8rem 0}
+.sec-lbl{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.12em;margin-bottom:.55rem;display:flex;align-items:center;gap:8px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;box-shadow:0 0 4px var(--green)}
+.no-dot{width:6px;height:6px;border-radius:50%;background:var(--b2);flex-shrink:0}
+
+/* Price hero card */
+.price-hero{background:var(--s2);border:1px solid var(--amber2);border-radius:var(--r);padding:.85rem 1rem;margin-bottom:8px}
+.ph-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2px}
+.ph-label{font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.06em;margin-bottom:4px}
+.ph-val{font-size:32px;font-weight:500;color:var(--amber);line-height:1;letter-spacing:-.01em}
+.ph-sub{font-size:10px;color:var(--t3);margin-top:4px}
+.ph-badge{font-family:var(--mono);font-size:9px;padding:3px 7px;border-radius:3px;background:var(--amber3);color:var(--amber);border:1px solid var(--amber2);flex-shrink:0}
+.ph-copies{font-family:var(--mono);font-size:10px;color:var(--t2);margin-top:6px;padding-top:6px;border-top:1px solid var(--b1);display:flex;justify-content:space-between;align-items:center}
+
+/* Condition medians */
+.cond-row{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
+.cond-box{background:var(--s2);border-radius:8px;padding:.5rem .4rem;text-align:center}
+.cond-box.hi{border:1px solid var(--amber2)}
+.cond-lbl{font-family:var(--mono);font-size:7px;color:var(--t3);letter-spacing:.04em;margin-bottom:3px}
+.cond-val{font-size:12px;font-weight:500}
+
+/* Stat row: min/media/max annunci attivi */
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px}
+.stat3-box{background:var(--s2);border-radius:var(--r);padding:.6rem .55rem;text-align:center}
+.stat3-lbl{font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.04em;margin-bottom:3px}
+.stat3-val{font-size:14px;font-weight:500}
+
+/* Chart */
+.chart-box{background:var(--s2);border-radius:var(--r);padding:.7rem .8rem;margin-bottom:8px}
+.chart-note{font-family:var(--mono);font-size:8px;color:var(--t4);margin-top:.3rem;line-height:1.4}
+.chart-legend{display:flex;gap:10px;margin-top:.35rem;flex-wrap:wrap}
+
+/* Community */
+.comm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.comm-box{background:var(--s2);border-radius:var(--r);padding:.55rem .7rem;text-align:center}
+.comm-lbl{font-family:var(--mono);font-size:8px;color:var(--t3);margin-bottom:3px;letter-spacing:.03em}
+.comm-val{font-size:16px;font-weight:500}
+
+/* Discogs link */
+.disc-link{display:flex;align-items:center;gap:10px;padding:.7rem .9rem;background:var(--s2);border-radius:var(--r);border:1px solid var(--b1);text-decoration:none;cursor:pointer;transition:border-color .18s;margin-bottom:.85rem}
+.disc-link:active{border-color:var(--amber)}
+.disc-link-name{font-family:var(--mono);font-size:9px;color:var(--t2);margin-bottom:2px}
+.disc-link-cta{font-size:11px;color:var(--amber)}
+
+/* Collector note */
+.coll-note{background:var(--s2);border-radius:var(--r);padding:.7rem .85rem;margin-bottom:.75rem;border-left:2px solid var(--amber2)}
+.coll-note p{font-size:12px;color:var(--t2);line-height:1.55;font-style:italic}
+
+.new-btn{width:100%;padding:13px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;cursor:pointer;background:transparent;color:var(--t2);border:1px solid var(--b1);border-radius:var(--r)}
+.new-btn:active{border-color:var(--amber);color:var(--amber)}
+
+/* ── DRAWER ───────────────────────────────────── */
+#drawer{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;opacity:0;pointer-events:none;transition:opacity .28s;-webkit-backdrop-filter:blur(5px)}
+#drawer.open{opacity:1;pointer-events:all}
+.drawer-panel{position:absolute;top:0;right:0;bottom:0;width:min(310px,88vw);background:var(--s1);padding:env(safe-area-inset-top,18px) 1.1rem 2rem;transform:translateX(100%);transition:transform .32s cubic-bezier(.16,1,.3,1);overflow-y:auto;display:flex;flex-direction:column;gap:.85rem}
+#drawer.open .drawer-panel{transform:translateX(0)}
+.drawer-hdr{display:flex;align-items:center;justify-content:space-between}
+.drawer-ttl{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.12em}
+.x-btn{width:27px;height:27px;border-radius:50%;border:1px solid var(--b1);background:none;color:var(--t2);cursor:pointer;font-size:12px}
+.d-sec-lbl{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.12em;margin-bottom:.5rem}
+.d-status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);margin-bottom:.6rem}
+.save-btn{padding:13px;font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.1em;cursor:pointer;background:var(--amber);color:#0d0d0d;border:none;border-radius:var(--r)}
+.danger-btn{padding:11px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;cursor:pointer;background:transparent;color:var(--red);border:1px solid var(--red2);border-radius:var(--r)}
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP SCREEN ════════════════════════════ -->
+<div class="screen" id="setup">
+  <div class="logo">
+    <div class="logo-ring"></div>
+    <span class="logo-name">VINYL SCAN</span>
+    <span class="logo-sub">Prezzi reali · Scanner per bancarelle e mercatini</span>
+    <span class="chip green">DISCOGS LIVE</span>
+  </div>
+
+  <div class="env-info">
+    ✓ &nbsp;Le chiavi API vengono lette dalle <strong>env vars di Netlify</strong>:<br>
+    <code style="font-size:10px">GROQ_API_KEY</code> &nbsp;e&nbsp; <code style="font-size:10px">DISCOGS_TOKEN</code><br><br>
+    Se non le hai ancora configurate, aggiungile su:<br>
+    Netlify → Site Settings → Environment Variables
+  </div>
+
+  <div class="card">
+    <div class="card-title">OVERRIDE MANUALE (opzionale)</div>
+    <div class="step"><span class="step-n">→</span><span class="step-t">Se le env vars non sono configurate, puoi inserire le chiavi qui sotto. Verranno salvate solo sul tuo dispositivo.</span></div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">GROQ API KEY <span class="chip gray" style="font-size:8px;padding:1px 5px">GRATIS</span></div>
+    <input type="password" id="in-groq" placeholder="gsk_... (lascia vuoto se in env vars)" autocomplete="off" spellcheck="false">
+    <p class="hint"><a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a></p>
+  </div>
+
+  <div class="field">
+    <div class="field-label">DISCOGS TOKEN <span class="chip gray" style="font-size:8px;padding:1px 5px">GRATIS</span></div>
+    <input type="password" id="in-discogs" placeholder="token... (lascia vuoto se in env vars)" autocomplete="off" spellcheck="false">
+    <p class="hint"><a href="https://www.discogs.com/settings/developers" target="_blank">discogs.com → Settings → Developers</a></p>
+  </div>
+
+  <button class="btn primary" onclick="setupGo()">AVVIA ▶</button>
+</div>
+
+<!-- ══ CAMERA ══════════════════════════════════ -->
+<div class="screen hidden" id="cam">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
+
+  <div class="vf" id="vf">
+    <span class="vf-hint">QUALSIASI ANGOLO — ANCHE SPINA DI LATO</span>
+    <div class="vf-corner tl"></div>
+    <div class="vf-corner tr"></div>
+    <div class="vf-corner bl"></div>
+    <div class="vf-corner br"></div>
+  </div>
+
+  <div class="scan-anim" id="scan-anim"></div>
+  <div class="scan-status" id="scan-status"></div>
+
+  <div class="topbar">
+    <span class="topbar-name">◉ VINYL SCAN</span>
+    <div class="topbar-r">
+      <span class="pill ok" id="api-pill">LIVE</span>
+      <div class="icon-btn" onclick="openDrawer()">⚙</div>
+    </div>
+  </div>
+
+  <div class="scan-wrap">
+    <div class="scan-ring" id="scan-ring" onclick="doScan()">
+      <div class="scan-dot">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" stroke="#0d0d0d" stroke-width="2.5"/>
+          <circle cx="12" cy="12" r="3" fill="#0d0d0d"/>
+        </svg>
+      </div>
+    </div>
+    <span class="scan-lbl" id="scan-lbl">SCANSIONA</span>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div id="sheet">
+    <div class="sheet-handle"></div>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<!-- ══ SETTINGS DRAWER ═════════════════════════ -->
+<div id="drawer" onclick="drawerBgClick(event)">
+  <div class="drawer-panel">
+    <div class="drawer-hdr">
+      <span class="drawer-ttl">IMPOSTAZIONI</span>
+      <button class="x-btn" onclick="closeDrawer()">✕</button>
+    </div>
+
+    <div>
+      <div class="d-sec-lbl">STATO CHIAVI API</div>
+      <div class="d-status"><span id="d-groq-dot" style="width:6px;height:6px;border-radius:50%;background:var(--b2);flex-shrink:0"></span> <span id="d-groq-status">Groq: verifica non effettuata</span></div>
+      <div class="d-status"><span id="d-disc-dot" style="width:6px;height:6px;border-radius:50%;background:var(--b2);flex-shrink:0"></span> <span id="d-disc-status">Discogs: verifica non effettuata</span></div>
+    </div>
+
+    <div>
+      <div class="d-sec-lbl">GROQ API KEY (OVERRIDE)</div>
+      <input type="password" id="s-groq" placeholder="gsk_... (lascia vuoto se in env vars)" style="margin-bottom:.35rem">
+      <p class="hint"><a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a> — gratis</p>
+    </div>
+
+    <div>
+      <div class="d-sec-lbl">DISCOGS TOKEN (OVERRIDE)</div>
+      <input type="password" id="s-discogs" placeholder="token... (lascia vuoto se in env vars)">
+      <p class="hint"><a href="https://www.discogs.com/settings/developers" target="_blank">discogs.com → Developers</a> — gratis</p>
+    </div>
+
+    <div style="font-size:10px;color:var(--t3);line-height:1.5;padding:.6rem .75rem;background:var(--s2);border-radius:var(--r)">
+      Le env vars Netlify <code style="color:var(--amber)">GROQ_API_KEY</code> e <code style="color:var(--amber)">DISCOGS_TOKEN</code> hanno sempre la priorità sulle chiavi inserite qui.
+    </div>
+
+    <button class="save-btn" onclick="saveDrawer()">SALVA</button>
+    <button class="danger-btn" onclick="resetAll()">Cancella tutto e reimposta</button>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════ */
+let GK = '', DT = '', busy = false;
+
+const VG_UP = new Set(['Mint (M)', 'Near Mint (NM or M-)', 'Very Good Plus (VG+)', 'Very Good (VG)']);
+
+/* ══════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════ */
+window.onload = () => {
+  GK = ls('vs_groq');
+  DT = ls('vs_discogs');
+  // Vai direttamente alla camera — le chiavi possono essere nelle env vars
+  camStart();
+  showScreen('cam');
+};
+
+function ls(k) { return localStorage.getItem(k) || ''; }
+function lsSet(k, v) { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); }
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+/* ══════════════════════════════════════════════════
+   SETUP
+══════════════════════════════════════════════════ */
+function setupGo() {
+  const k = document.getElementById('in-groq').value.trim();
+  const d = document.getElementById('in-discogs').value.trim();
+  GK = k; DT = d;
+  lsSet('vs_groq', k); lsSet('vs_discogs', d);
+  camStart(); showScreen('cam');
+}
+
+/* ══════════════════════════════════════════════════
+   CAMERA
+══════════════════════════════════════════════════ */
+async function camStart() {
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    document.getElementById('video').srcObject = s;
+  } catch (e) {
+    showToast('Accesso camera negato. Abilita la fotocamera nelle impostazioni del browser.');
+  }
+}
+
+function capture() {
+  const v = document.getElementById('video');
+  const c = document.getElementById('canvas');
+  c.width = v.videoWidth || 1280;
+  c.height = v.videoHeight || 720;
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.88).split(',')[1];
+}
+
+/* ══════════════════════════════════════════════════
+   SCAN STATE UI
+══════════════════════════════════════════════════ */
+function setScan(on, label = '') {
+  busy = on;
+  document.getElementById('scan-anim').style.display = on ? 'block' : 'none';
+  document.getElementById('scan-status').style.display = on ? 'block' : 'none';
+  if (on) document.getElementById('scan-status').textContent = label;
+  document.getElementById('vf').style.opacity = on ? 0 : 1;
+  document.getElementById('scan-ring').style.opacity = on ? 0 : 1;
+  document.getElementById('scan-lbl').textContent = on ? '' : 'SCANSIONA';
+}
+
+/* ══════════════════════════════════════════════════
+   MAIN SCAN
+══════════════════════════════════════════════════ */
+async function doScan() {
+  if (busy) return;
+  busy = true;
+  closeSheet();
+  setScan(true, 'RICONOSCE IL DISCO...');
+
+  try {
+    // ── Step 1: Groq vision ──
+    const img = capture();
+    const groqRes = await fetch('/.netlify/functions/groq', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_b64: img, groq_key: GK }),
+    });
+
+    if (!groqRes.ok) throw new Error('Groq function: HTTP ' + groqRes.status);
+    const groqData = await groqRes.json();
+
+    // Aggiorna stato chiave Groq
+    setKeyStatus('groq', !groqData.error || groqData.found !== false);
+
+    if (!groqData.found || groqData.error) {
+      const msg = groqData.error || 'Non riesco a identificare il disco — avvicinati, cambia angolazione o illumina meglio';
+      showToast(msg);
+      setScan(false);
+      return;
+    }
+
+    // ── Step 2: Discogs ──
+    let discogsData = null;
+    setScan(true, 'CERCA SU DISCOGS...');
+    try {
+      const discRes = await fetch('/.netlify/functions/discogs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query:          groqData.discogs_query,
+          artist:         groqData.artist,
+          album:          groqData.album,
+          catalog_number: groqData.catalog_number,
+          year:           groqData.year,
+          discogs_token:  DT,
+        }),
+      });
+
+      if (discRes.ok) {
+        discogsData = await discRes.json();
+        setKeyStatus('discogs', !discogsData.error);
+      }
+    } catch (e) {
+      console.warn('Discogs step failed:', e.message);
+    }
+
+    renderSheet(groqData, discogsData);
+
+  } catch (e) {
+    showToast('Errore: ' + (e.message || 'Riprova'));
+  }
+
+  setScan(false);
+}
+
+/* ══════════════════════════════════════════════════
+   HELPERS MATH
+══════════════════════════════════════════════════ */
+function calcMedian(arr) {
+  if (!arr.length) return null;
+  const s = [...arr].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+/* ══════════════════════════════════════════════════
+   CHART SVG — annunci attivi per data inserimento
+══════════════════════════════════════════════════ */
+function buildChart(chartData, currency) {
+  if (!chartData || chartData.length < 3) return '';
+
+  const cur = currency || '€';
+  const items = chartData.slice(-50); // ultimi 50
+
+  const dates  = items.map(d => new Date(d.date).getTime());
+  const prices = items.map(d => d.price);
+
+  const minDate = Math.min(...dates), maxDate = Math.max(...dates);
+  const minP = Math.min(...prices),   maxP = Math.max(...prices);
+  const dateRange  = maxDate - minDate || 1;
+  const priceRange = maxP - minP || 1;
+
+  // SVG dimensions
+  const W = 300, H = 72, ML = 28, MR = 4, MT = 6, MB = 18;
+  const iW = W - ML - MR, iH = H - MT - MB;
+
+  const pts = items.map(d => ({
+    x: ML + ((new Date(d.date).getTime() - minDate) / dateRange) * iW,
+    y: MT + (1 - (d.price - minP) / priceRange) * iH,
+    price: d.price,
+    cond:  d.condition,
+    date:  d.date,
+  }));
+
+  const condColor = cond => {
+    if (cond === 'Mint (M)')             return '#4a9a5a';
+    if (cond === 'Near Mint (NM or M-)') return '#5aaa6a';
+    if (cond === 'Very Good Plus (VG+)') return '#e8a020';
+    return '#777770'; // VG
+  };
+
+  // Polyline path
+  const poly = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  // Area gradient fill
+  const areaFirst = `${ML},${MT + iH}`;
+  const areaLast  = `${pts[pts.length - 1].x.toFixed(1)},${MT + iH}`;
+  const areaPath  = `${pts[0].x.toFixed(1)},${MT + iH} ${poly} ${areaLast}`;
+
+  // Dots
+  const dots = pts.map(p =>
+    `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5" fill="${condColor(p.cond)}" opacity="0.9"/>`
+  ).join('');
+
+  // Median line
+  const med = calcMedian(prices);
+  const medY = med != null ? MT + (1 - (med - minP) / priceRange) * iH : null;
+  const medLine = medY != null
+    ? `<line x1="${ML}" y1="${medY.toFixed(1)}" x2="${W - MR}" y2="${medY.toFixed(1)}" stroke="rgba(232,160,32,0.35)" stroke-width="1" stroke-dasharray="4 2"/>`
+    : '';
+
+  // Italian date format short
+  const MESI = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  const fmtD = ts => { const d = new Date(ts); return `${d.getDate()} ${MESI[d.getMonth()]}`; };
+
+  // 3 date labels
+  const dateLabelPos = [
+    { x: ML, ts: minDate, anchor: 'start' },
+    { x: ML + iW / 2, ts: minDate + dateRange / 2, anchor: 'middle' },
+    { x: W - MR, ts: maxDate, anchor: 'end' },
+  ];
+  const dateLabels = dateLabelPos.map(l =>
+    `<text x="${l.x}" y="${H + 1}" font-family="IBM Plex Mono,monospace" font-size="7" fill="#444440" text-anchor="${l.anchor}">${fmtD(l.ts)}</text>`
+  ).join('');
+
+  // Price labels
+  const fmtP = v => `${cur}${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}`;
+  const priceLabels = `
+    <text x="${ML - 2}" y="${MT + 6}" font-family="IBM Plex Mono,monospace" font-size="7" fill="#555550" text-anchor="end">${fmtP(maxP)}</text>
+    <text x="${ML - 2}" y="${MT + iH + 1}" font-family="IBM Plex Mono,monospace" font-size="7" fill="#555550" text-anchor="end">${fmtP(minP)}</text>`;
+
+  const medLabel = med != null && medY != null
+    ? `<text x="${W - MR}" y="${medY.toFixed(1)}" dy="-2" font-family="IBM Plex Mono,monospace" font-size="7" fill="rgba(232,160,32,.55)" text-anchor="end">med ${fmtP(med)}</text>`
+    : '';
+
+  return `<div class="chart-box">
+    <div class="sec-lbl" style="margin-bottom:.4rem"><span class="live-dot"></span>ANNUNCI ATTIVI — PREZZO PER DATA INSERIMENTO</div>
+    <svg width="100%" viewBox="0 0 ${W} ${H + 10}" style="display:block;overflow:visible">
+      <defs>
+        <linearGradient id="ag${Date.now() % 9999}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#e8a020" stop-opacity="0.08"/>
+          <stop offset="100%" stop-color="#e8a020" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <line x1="${ML}" y1="${MT}" x2="${W - MR}" y2="${MT}" stroke="#252520" stroke-width="0.5"/>
+      <line x1="${ML}" y1="${MT + iH / 2}" x2="${W - MR}" y2="${MT + iH / 2}" stroke="#252520" stroke-width="0.5" stroke-dasharray="3 3"/>
+      <line x1="${ML}" y1="${MT + iH}" x2="${W - MR}" y2="${MT + iH}" stroke="#252520" stroke-width="0.5"/>
+      <polygon points="${areaPath}" fill="rgba(232,160,32,0.06)"/>
+      ${medLine}
+      ${medLabel}
+      <polyline points="${poly}" fill="none" stroke="rgba(232,160,32,0.28)" stroke-width="1.5" stroke-linejoin="round"/>
+      ${dots}
+      ${priceLabels}
+      ${dateLabels}
+    </svg>
+    <div class="chart-legend">
+      <span style="font-family:var(--mono);font-size:8px;color:#5aaa6a">● M/NM</span>
+      <span style="font-family:var(--mono);font-size:8px;color:var(--amber)">● VG+</span>
+      <span style="font-family:var(--mono);font-size:8px;color:#777770">● VG</span>
+    </div>
+    <div class="chart-note">Data di inserimento annuncio su Discogs. ${items.length} annunci VG+. La storia delle vendite concluse non è disponibile via API Discogs.</div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════
+   RENDER RESULTS SHEET
+══════════════════════════════════════════════════ */
+function renderSheet(v, d) {
+  const confMap = {
+    high:   { c: 'var(--green)',  w: '100%', txt: 'Identificazione sicura' },
+    medium: { c: 'var(--amber)',  w: '65%',  txt: 'Identificazione probabile — verifica' },
+    low:    { c: 'var(--red)',    w: '30%',  txt: 'Incerto — controlla prima di comprare' },
+  };
+  const cConf = confMap[v.confidence] || { c: 'var(--amber)', w: '50%', txt: '' };
+  const pType = v.pressing_type || 'Unknown';
+  const pCls  = pType.includes('Original') ? 'ok' : pType.includes('Reissue') ? 'warn' : '';
+
+  const hasD = !!d && !d.error;
+  const cur  = hasD ? (d.listings_currency || d.median_currency || '€') : '€';
+  const S    = (v, dec = 0) => v != null ? `${cur} ${Number(v).toFixed(dec)}` : null;
+  const Sf   = (v) => v != null ? `${cur} ${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}` : '—';
+
+  // ── Header ──
+  let html = `
+    <p class="alb-artist">${esc(v.artist)}</p>
+    <p class="alb-title">${esc(v.album)}${v.year ? ` · <span style="color:var(--t3)">${esc(String(v.year))}</span>` : ''}</p>
+    <div class="tags">
+      ${v.format          ? `<span class="tag">${esc(v.format)}</span>` : ''}
+      ${(v.label || d?.label) ? `<span class="tag">${esc(v.label || d.label)}</span>` : ''}
+      ${(v.country_press || d?.country) ? `<span class="tag">${esc(v.country_press || d.country)}</span>` : ''}
+      ${v.catalog_number  ? `<span class="tag">${esc(v.catalog_number)}</span>` : ''}
+      ${pType !== 'Unknown' ? `<span class="tag ${pCls}">${esc(pType)}</span>` : ''}
+      ${(v.genre || d?.genres) ? `<span class="tag">${esc(v.genre || d.genres)}</span>` : ''}
+    </div>
+    <div class="conf-strip"><div class="conf-fill" style="width:${cConf.w};background:${cConf.c}"></div></div>
+    <p class="conf-note" style="color:${cConf.c}">${cConf.txt}${v.confidence_reason ? ` — ${esc(v.confidence_reason)}` : ''}</p>`;
+
+  if (v.visible_clues) {
+    html += `<p style="font-size:10px;color:var(--t3);margin-bottom:.8rem;line-height:1.5">👁 ${esc(v.visible_clues)}</p>`;
+  }
+  if (v.collector_note) {
+    html += `<div class="coll-note"><p>${esc(v.collector_note)}</p></div>`;
+  }
+
+  html += `<div class="div"></div>`;
+
+  // ── Dati Discogs ──
+  if (!hasD) {
+    // Nessun dato Discogs
+    const errMsg = d?.error || 'Aggiungi il Discogs token nelle impostazioni ⚙';
+    html += `<div class="sec-lbl"><span class="no-dot"></span>DISCOGS — ${esc(errMsg)}</div>`;
+    const q = encodeURIComponent((v.discogs_query || v.artist + ' ' + v.album));
+    html += `<a href="https://www.discogs.com/search/?q=${q}&type=release&format=Vinyl" class="disc-link" target="_blank">
+      <span style="font-size:16px">💿</span>
+      <div><div class="disc-link-name">DISCOGS</div><div class="disc-link-cta">Cerca manualmente →</div></div>
+    </a>`;
+  } else {
+    // ── HERO: media annunci VG+ (o mediana Discogs VG+ come fallback) ──
+    const heroVal = d.listings_avg ?? d.listings_median ?? d.median_vgp ?? d.median_nm;
+    const numOnline = d.num_for_sale ?? d.listings_count ?? 0;
+
+    html += `<div class="sec-lbl"><span class="live-dot"></span>PREZZI LIVE DISCOGS — VG / VG+ / NM / M</div>`;
+
+    if (heroVal != null) {
+      html += `<div class="price-hero">
+        <div class="ph-top">
+          <div>
+            <div class="ph-label">MEDIA ANNUNCI ATTIVI VG+/NM/M</div>
+            <div class="ph-val">${Sf(heroVal)}</div>
+          </div>
+          <div class="ph-badge">LIVE</div>
+        </div>
+        <div class="ph-copies">
+          <span>📦 ${numOnline} cop${numOnline === 1 ? 'ia' : 'ie'} online su Discogs</span>
+          ${d.listings_median != null ? `<span style="color:var(--t3)">med ${Sf(d.listings_median)}</span>` : ''}
+        </div>
+      </div>`;
+    } else if (numOnline > 0) {
+      html += `<div class="price-hero">
+        <div class="ph-top">
+          <div>
+            <div class="ph-label">COPIE ONLINE SU DISCOGS</div>
+            <div class="ph-val" style="font-size:24px">${numOnline}</div>
+          </div>
+          <div class="ph-badge">LIVE</div>
+        </div>
+      </div>`;
+    }
+
+    // ── Mediane ufficiali Discogs per condizione (da vendite reali) ──
+    if (d.median_vg || d.median_vgp || d.median_nm || d.median_m) {
+      html += `<div style="font-family:var(--mono);font-size:8px;color:var(--t3);margin-bottom:5px;letter-spacing:.06em">PREZZO MEDIANO PER CONDIZIONE (DISCOGS, DA VENDITE REALI)</div>
+      <div class="cond-row">
+        <div class="cond-box">
+          <div class="cond-lbl">VG</div>
+          <div class="cond-val" style="color:var(--t2)">${Sf(d.median_vg)}</div>
+        </div>
+        <div class="cond-box hi">
+          <div class="cond-lbl">VG+</div>
+          <div class="cond-val" style="color:var(--amber)">${Sf(d.median_vgp)}</div>
+        </div>
+        <div class="cond-box" style="border:1px solid var(--green3)">
+          <div class="cond-lbl">NM</div>
+          <div class="cond-val" style="color:var(--green)">${Sf(d.median_nm)}</div>
+        </div>
+        <div class="cond-box">
+          <div class="cond-lbl">M</div>
+          <div class="cond-val" style="color:var(--green)">${Sf(d.median_m)}</div>
+        </div>
+      </div>`;
+    }
+
+    // ── Min / Media / Max annunci attivi ──
+    if (d.listings_count > 0) {
+      html += `<div class="stat3">
+        <div class="stat3-box">
+          <div class="stat3-lbl">MIN VG+</div>
+          <div class="stat3-val" style="color:var(--green);font-size:13px">${Sf(d.listings_min)}</div>
+        </div>
+        <div class="stat3-box" style="border:1px solid var(--b2)">
+          <div class="stat3-lbl">MEDIA</div>
+          <div class="stat3-val" style="color:var(--amber);font-size:13px">${Sf(d.listings_avg)}</div>
+        </div>
+        <div class="stat3-box">
+          <div class="stat3-lbl">MAX VG+</div>
+          <div class="stat3-val" style="color:var(--t2);font-size:13px">${Sf(d.listings_max)}</div>
+        </div>
+      </div>`;
+    }
+
+    // ── Grafico annunci per data inserimento ──
+    if (d.chart_data && d.chart_data.length >= 3) {
+      html += buildChart(d.chart_data, cur);
+    }
+
+    // ── Community stats ──
+    if (d.community_want != null || d.community_have != null || d.num_for_sale != null) {
+      html += `<div class="comm-grid">
+        ${d.community_want != null ? `<div class="comm-box"><div class="comm-lbl">VOGLIONO</div><div class="comm-val" style="color:var(--amber)">${d.community_want.toLocaleString('it')}</div></div>` : ''}
+        ${d.community_have != null ? `<div class="comm-box"><div class="comm-lbl">HANNO</div><div class="comm-val">${d.community_have.toLocaleString('it')}</div></div>` : ''}
+        ${d.num_for_sale   != null ? `<div class="comm-box"><div class="comm-lbl">IN VENDITA</div><div class="comm-val" style="color:var(--green)">${d.num_for_sale.toLocaleString('it')}</div></div>` : ''}
+      </div>`;
+    }
+
+    // ── Link Discogs ──
+    const discUrl = d.release_url ||
+      `https://www.discogs.com/search/?q=${encodeURIComponent(v.discogs_query || v.artist + ' ' + v.album)}&type=release&format=Vinyl`;
+    html += `<a href="${discUrl}" class="disc-link" target="_blank">
+      <span style="font-size:16px">💿</span>
+      <div>
+        <div class="disc-link-name">DISCOGS</div>
+        <div class="disc-link-cta">Apri release completa →</div>
+      </div>
+    </a>`;
+  }
+
+  html += `<div class="div"></div>
+  <button class="new-btn" onclick="newScan()">← NUOVO SCAN</button>`;
+
+  document.getElementById('sheet-body').innerHTML = html;
+  document.getElementById('sheet').classList.add('open');
+}
+
+/* ══════════════════════════════════════════════════
+   KEY STATUS INDICATOR
+══════════════════════════════════════════════════ */
+function setKeyStatus(which, ok) {
+  const dot   = document.getElementById(`d-${which === 'groq' ? 'groq' : 'disc'}-dot`);
+  const label = document.getElementById(`d-${which === 'groq' ? 'groq' : 'disc'}-status`);
+  const pill  = document.getElementById('api-pill');
+  if (dot && label) {
+    dot.style.background = ok ? 'var(--green)' : 'var(--red)';
+    label.textContent = (which === 'groq' ? 'Groq: ' : 'Discogs: ') + (ok ? 'OK ✓' : 'errore — controlla chiave');
+  }
+  if (pill) {
+    pill.className = 'pill ' + (ok ? 'ok' : 'warn');
+    pill.textContent = ok ? 'LIVE' : 'ERR';
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════════════ */
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function closeSheet() { document.getElementById('sheet').classList.remove('open'); }
+function newScan() { closeSheet(); setTimeout(() => { document.getElementById('sheet-body').innerHTML = ''; }, 380); }
+function showToast(m) {
+  const t = document.getElementById('toast');
+  t.textContent = m;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 6000);
+}
+
+/* ══════════════════════════════════════════════════
+   DRAWER
+══════════════════════════════════════════════════ */
+function openDrawer() {
+  document.getElementById('s-groq').value    = ls('vs_groq');
+  document.getElementById('s-discogs').value = ls('vs_discogs');
+  document.getElementById('drawer').classList.add('open');
+}
+function closeDrawer() { document.getElementById('drawer').classList.remove('open'); }
+function drawerBgClick(e) { if (e.target === document.getElementById('drawer')) closeDrawer(); }
+function saveDrawer() {
+  GK = document.getElementById('s-groq').value.trim();
+  DT = document.getElementById('s-discogs').value.trim();
+  lsSet('vs_groq', GK);
+  lsSet('vs_discogs', DT);
+  closeDrawer();
+}
+function resetAll() {
+  if (!confirm('Cancellare tutte le impostazioni salvate?')) return;
+  localStorage.clear();
+  location.reload();
+}
+</script>
+</body>
+</html>

@@ -275,19 +275,34 @@ async function getReleaseData(body, TOKEN) {
       results.listings_avg      = r2(prices.reduce((a, b) => a + b, 0) / prices.length);
       results.listings_currency = good[0].price.currency || 'EUR';
 
-      // Ultimi 15 annunci per data inserimento → grafico
+      // Ultimi 15 annunci per il grafico
+      // Prova prima con data, fallback su tutti gli annunci ordinati per prezzo
       const withDate = good
         .filter(l => l.listed || l.posted)
         .map(l => ({
           date:      (l.listed || l.posted || '').slice(0, 10),
           price:     r2(l.price.value),
           condition: l.condition,
+          has_date:  true,
         }))
         .filter(l => l.date.length === 10)
-        .sort((a, b) => b.date.localeCompare(a.date)) // recenti prima
-        .slice(0, 15);                                  // ultimi 15
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 15)
+        .reverse();
 
-      results.last_listings = withDate.reverse(); // cronologico per il grafico
+      if (withDate.length >= 2) {
+        results.last_listings = withDate;
+      } else {
+        // Fallback: usa tutti gli annunci VG+ ordinati per prezzo crescente
+        // Il grafico li mostra come "annuncio 1..N" sull'asse Y
+        results.last_listings = good.slice(0, 15).map((l, i) => ({
+          date:      null,
+          index:     i + 1,
+          price:     r2(l.price.value),
+          condition: l.condition,
+          has_date:  false,
+        }));
+      }
     }
 
     // Fallback num_for_sale

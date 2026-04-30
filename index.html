@@ -681,28 +681,23 @@ function renderPricePanel(groq, d, ver) {
 }
 
 /* ══════════════════════════════════════════════
-   CHART — ultimi 15 annunci attivi VG+
+   CHART — verticale, una riga per annuncio
 ══════════════════════════════════════════════ */
 function buildChart(items, currency) {
   if (!items || items.length < 2) return '';
+
   const cur    = currency || '€';
   const prices = items.map(d => d.price);
   const minP   = Math.min.apply(null, prices);
   const maxP   = Math.max.apply(null, prices);
   const pRange = maxP - minP || 1;
+  const hasDate = !!(items[0] && items[0].has_date && items[0].date);
 
-  const W = 300, H = 80, ML = 30, MR = 4, MT = 8, MB = 20;
-  const iW = W - ML - MR, iH = H - MT - MB;
-
-  const pts = items.map((d, i) => ({
-    x:     ML + (i / Math.max(items.length - 1, 1)) * iW,
-    y:     MT + (1 - (d.price - minP) / pRange) * iH,
-    price: d.price,
-    cond:  d.condition,
-    date:  d.date,
-  }));
-
-  const poly = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  // Layout verticale: una riga per ogni annuncio
+  const rowH = 26;
+  const W = 300, ML = 34, MR = 52, MT = 18, MB = 8;
+  const iW = W - ML - MR;
+  const H  = MT + items.length * rowH + MB;
 
   const condColor = c => {
     if (c === 'Mint (M)')             return '#4a9a5a';
@@ -711,49 +706,78 @@ function buildChart(items, currency) {
     return '#777770';
   };
 
-  const dots = pts.map(p =>
-    `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${condColor(p.cond)}" stroke="#161616" stroke-width="1"/>
-     <title>${p.date}: ${cur} ${p.price.toFixed(1)} (${p.cond})</title>`
-  ).join('');
-
-  // Median line
-  const sorted = [...prices].sort((a,b) => a-b);
-  const mid = Math.floor(sorted.length/2);
-  const med = sorted.length % 2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
-  const medY = MT + (1 - (med - minP) / pRange) * iH;
-
+  const MESI = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  const fmtD = s => {
+    try { const d = new Date(s); return `${d.getDate()} ${MESI[d.getMonth()]}`; }
+    catch(e) { return s || ''; }
+  };
   const fmtP = v => `${cur}${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}`;
 
-  // Date label only for first and last
-  const MESI = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
-  const fmtD = s => { const d = new Date(s); return `${d.getDate()} ${MESI[d.getMonth()]}`; };
-  const dateFirst = pts[0]     ? fmtD(pts[0].date)                 : '';
-  const dateLast  = pts[pts.length-1] ? fmtD(pts[pts.length-1].date) : '';
+  // Mediana
+  const sorted = [...prices].sort((a,b) => a-b);
+  const mid = Math.floor(sorted.length/2);
+  const med = sorted.length%2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+  const medX = ML + ((med - minP) / pRange) * iW;
 
-  // Area
-  const areaPath = `${ML},${MT+iH} ${poly} ${pts[pts.length-1].x.toFixed(1)},${MT+iH}`;
+  // Punti: X = prezzo, Y = centro riga
+  const pts = items.map((d, i) => ({
+    x:     ML + ((d.price - minP) / pRange) * iW,
+    y:     MT + i * rowH + rowH / 2,
+    price: d.price,
+    cond:  d.condition,
+    label: hasDate ? fmtD(d.date) : `#${d.index || i+1}`,
+  }));
+
+  // Sfondo zebra
+  const zebra = items.map((_, i) =>
+    i % 2 === 0
+      ? `<rect x="${ML}" y="${MT+i*rowH}" width="${iW}" height="${rowH}" fill="rgba(255,255,255,0.018)"/>`
+      : ''
+  ).join('');
+
+  // Linea serpentina tra dots
+  const poly = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  // Riga per riga: label sinistra + trattino + dot + prezzo destra
+  const rows = pts.map(p => {
+    const col = condColor(p.cond);
+    return `
+      <text x="${ML-4}" y="${(p.y+3).toFixed(1)}" font-family="IBM Plex Mono,monospace" font-size="8" fill="#555550" text-anchor="end">${p.label}</text>
+      <line x1="${ML}" y1="${p.y.toFixed(1)}" x2="${(p.x-5).toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#252520" stroke-width="0.5" stroke-dasharray="2 2"/>
+      <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${col}" stroke="#0d0d0d" stroke-width="1.5"/>
+      <text x="${W-MR+7}" y="${(p.y+3.5).toFixed(1)}" font-family="IBM Plex Mono,monospace" font-size="8.5" fill="${col}" font-weight="500">${fmtP(p.price)}</text>`;
+  }).join('');
+
+  const titleLabel = hasDate
+    ? `ULTIMI ${items.length} ANNUNCI VG+ — PREZZO × DATA`
+    : `${items.length} ANNUNCI ATTIVI VG+ — DAL MENO AL PIÙ CARO`;
+
+  const noteText = hasDate
+    ? 'Dal più vecchio in alto al più recente in basso. Solo annunci attivi.'
+    : 'Discogs non restituisce la data su tutti gli annunci — ordinati per prezzo crescente.';
 
   return `<div class="chart-box">
-    <div class="sec-lbl" style="margin-bottom:.4rem"><span class="live-dot"></span>ULTIMI ${items.length} ANNUNCI ATTIVI VG+ — PREZZO</div>
-    <svg width="100%" viewBox="0 0 ${W} ${H+4}" style="display:block;overflow:visible">
-      <line x1="${ML}" y1="${MT}" x2="${W-MR}" y2="${MT}" stroke="#252520" stroke-width="0.5"/>
-      <line x1="${ML}" y1="${MT+iH}" x2="${W-MR}" y2="${MT+iH}" stroke="#252520" stroke-width="0.5"/>
-      <polygon points="${areaPath}" fill="rgba(232,160,32,0.05)"/>
-      <line x1="${ML}" y1="${medY.toFixed(1)}" x2="${W-MR}" y2="${medY.toFixed(1)}" stroke="rgba(232,160,32,0.3)" stroke-width="1" stroke-dasharray="4 3"/>
-      <text x="${W-MR}" y="${(medY-2).toFixed(1)}" font-family="IBM Plex Mono,monospace" font-size="7" fill="rgba(232,160,32,.6)" text-anchor="end">med ${fmtP(med)}</text>
-      <polyline points="${poly}" fill="none" stroke="rgba(232,160,32,0.22)" stroke-width="1.5" stroke-linejoin="round"/>
-      ${dots}
-      <text x="${ML-2}" y="${MT+5}"    font-family="IBM Plex Mono,monospace" font-size="7" fill="#555550" text-anchor="end">${fmtP(maxP)}</text>
-      <text x="${ML-2}" y="${MT+iH+1}" font-family="IBM Plex Mono,monospace" font-size="7" fill="#555550" text-anchor="end">${fmtP(minP)}</text>
-      <text x="${ML}"   y="${H+3}" font-family="IBM Plex Mono,monospace" font-size="7" fill="#444440">${dateFirst}</text>
-      <text x="${W-MR}" y="${H+3}" font-family="IBM Plex Mono,monospace" font-size="7" fill="#444440" text-anchor="end">${dateLast}</text>
+    <div class="sec-lbl" style="margin-bottom:.5rem"><span class="live-dot"></span>${titleLabel}</div>
+    <svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">
+      ${zebra}
+      <!-- Assi prezzi in cima -->
+      <text x="${ML}" y="${MT-5}" font-family="IBM Plex Mono,monospace" font-size="7" fill="#3a3a36" text-anchor="middle">${fmtP(minP)}</text>
+      <text x="${ML+iW/2}" y="${MT-5}" font-family="IBM Plex Mono,monospace" font-size="7" fill="rgba(232,160,32,.45)" text-anchor="middle">${fmtP(med)} med</text>
+      <text x="${ML+iW}" y="${MT-5}" font-family="IBM Plex Mono,monospace" font-size="7" fill="#3a3a36" text-anchor="middle">${fmtP(maxP)}</text>
+      <!-- Asse verticale -->
+      <line x1="${ML}" y1="${MT-2}" x2="${ML}" y2="${H-MB}" stroke="#2a2a2a" stroke-width="0.5"/>
+      <!-- Linea mediana -->
+      <line x1="${medX.toFixed(1)}" y1="${MT-2}" x2="${medX.toFixed(1)}" y2="${H-MB}" stroke="rgba(232,160,32,0.18)" stroke-width="1" stroke-dasharray="3 3"/>
+      <!-- Serpentina -->
+      <polyline points="${poly}" fill="none" stroke="rgba(232,160,32,0.15)" stroke-width="1.5" stroke-linejoin="round"/>
+      ${rows}
     </svg>
-    <div class="chart-legend">
-      <span style="font-family:var(--mono);font-size:8px;color:#5aaa6a">● M / NM</span>
+    <div class="chart-legend" style="margin-top:.4rem">
+      <span style="font-family:var(--mono);font-size:8px;color:#5aaa6a">● M/NM</span>
       <span style="font-family:var(--mono);font-size:8px;color:var(--amber)">● VG+</span>
       <span style="font-family:var(--mono);font-size:8px;color:#777770">● VG</span>
     </div>
-    <div class="chart-note">Annunci attivi su Discogs ordinati per data inserimento. I prezzi delle vendite concluse non sono accessibili via API pubblica Discogs.</div>
+    <div class="chart-note">${noteText}</div>
   </div>`;
 }
 
